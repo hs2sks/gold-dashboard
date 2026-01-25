@@ -287,12 +287,56 @@ sudo certbot --nginx -d your-domain.com
 
 ### 4.1 Vercel
 
+#### 배포 시 환경 변수 추가
+
 1. 프로젝트 **"Settings"** > **"Environment Variables"**
 2. 변수 추가:
    - `METALS_API_KEY`
    - `EXCHANGE_RATE_API_KEY`
    - `DATA_GO_KR_SERVICE_KEY`
 3. **Environment**: Production, Preview, Development 모두 선택
+
+#### 배포 후 환경 변수 추가/수정하기
+
+**Step 1: Vercel 대시보드 접속**
+
+1. [Vercel 대시보드](https://vercel.com/dashboard) 접속
+2. 배포한 프로젝트(`gold-dashboard`) 클릭
+
+**Step 2: 환경 변수 추가**
+
+1. 상단 메뉴에서 **"Settings"** 클릭
+2. 왼쪽 사이드바에서 **"Environment Variables"** 클릭
+3. **"Add New"** 버튼 클릭
+4. 다음 정보 입력:
+   - **Key**: `METALS_API_KEY` (또는 다른 변수명)
+   - **Value**: 실제 API 키 값 입력
+   - **Environment**: 
+     - ✅ Production (프로덕션 환경)
+     - ✅ Preview (미리보기 환경)
+     - ✅ Development (개발 환경)
+     - 또는 필요한 환경만 선택
+5. **"Save"** 클릭
+
+**Step 3: 재배포 (중요!)**
+
+환경 변수를 추가/수정한 후에는 **반드시 재배포**해야 적용됩니다:
+
+1. 상단 메뉴에서 **"Deployments"** 탭 클릭
+2. 가장 최근 배포 항목의 **"⋯"** (점 3개) 메뉴 클릭
+3. **"Redeploy"** 선택
+4. **"Redeploy"** 버튼 클릭
+5. 약 1-2분 후 재배포 완료
+
+**또는 자동 재배포:**
+
+- GitHub에 새로운 커밋을 push하면 자동으로 재배포되며, 새로 추가한 환경 변수도 함께 적용됩니다.
+
+**환경 변수 확인:**
+
+- 재배포 후 사이트가 정상 작동하는지 확인
+- 브라우저 개발자 도구(F12) > Console에서 에러 확인
+- API 엔드포인트가 실제 데이터를 반환하는지 확인
 
 ### 4.2 Netlify
 
@@ -532,9 +576,18 @@ git push
 
 **A**: 네! Vercel/Netlify에서 제공하는 무료 URL을 사용할 수 있습니다.
 
-### Q4: 배포 후 API 키를 바꾸려면?
+### Q4: 배포 후 API 키를 추가하거나 바꾸려면?
 
-**A**: 배포 플랫폼의 환경 변수 설정에서 변경 후 재배포하면 됩니다.
+**A**: 다음 단계를 따르세요:
+
+1. **Vercel 대시보드** 접속 → 프로젝트 선택
+2. **Settings** > **Environment Variables** 메뉴
+3. 기존 변수는 **"Edit"** 클릭하여 수정, 새 변수는 **"Add New"** 클릭
+4. 변수 값 입력 후 **"Save"**
+5. **Deployments** 탭 → 최신 배포의 **"Redeploy"** 클릭
+6. 1-2분 후 재배포 완료
+
+**참고**: 환경 변수만 추가/수정해도 재배포가 필요합니다. GitHub에 push하면 자동 재배포되며 새 환경 변수도 적용됩니다.
 
 ### Q5: 모바일에서도 잘 작동하나요?
 

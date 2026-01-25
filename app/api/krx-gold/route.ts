@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { parseString } from 'xml2js';
+import { promisify } from 'util';
+
+const parseXML = promisify(parseString);
 
 // 캐시 저장소
 let cache: {
@@ -63,35 +67,64 @@ export async function GET(request: NextRequest) {
       // 공공데이터 API는 서비스 키를 URL 인코딩해야 할 수 있음
       const encodedServiceKey = encodeURIComponent(SERVICE_KEY);
       
-      // 공공데이터 API 엔드포인트 (여러 가능한 경로 시도)
+      // 공공데이터 API 엔드포인트
       const apiBaseUrl = 'https://apis.data.go.kr/1160100/service/GetGeneralProductInfoService';
-      const goldUrl = `${apiBaseUrl}/getGnrlPrdctClpr?serviceKey=${encodedServiceKey}&numOfRows=10&pageNo=1&resultType=json&itmKndCd=20`;
+      // XML 형식으로 요청 (공공데이터 API는 XML이 기본)
+      const goldUrl = `${apiBaseUrl}/getGnrlPrdctClpr?serviceKey=${encodedServiceKey}&numOfRows=10&pageNo=1&resultType=xml&itmKndCd=20`;
       
       console.log('KRX API 호출:', {
         url: `${apiBaseUrl}/getGnrlPrdctClpr`,
         serviceKeyLength: SERVICE_KEY.length,
         serviceKeyEncoded: encodedServiceKey.length !== SERVICE_KEY.length,
+        resultType: 'xml',
       });
       
       const response = await fetch(goldUrl, {
         signal: controller.signal,
         headers: {
-          'Accept': 'application/json',
+          'Accept': 'application/xml, text/xml, */*',
         },
       });
 
       clearTimeout(timeoutId);
 
-      // 응답 본문을 먼저 읽어서 JSON인지 확인
+      // 응답 본문 읽기
       const responseText = await response.text();
       let data: any;
       
+      // XML 또는 JSON 파싱 시도
       try {
+        // 먼저 JSON으로 시도
         data = JSON.parse(responseText);
-      } catch (parseError) {
-        // JSON 파싱 실패 시 HTML 오류 페이지일 수 있음
-        console.error('KRX API Response (not JSON):', responseText.substring(0, 500));
-        throw new Error(`API returned non-JSON response. Status: ${response.status}. This may indicate the API endpoint is incorrect or the service is unavailable.`);
+      } catch (jsonError) {
+        try {
+          // JSON 실패 시 XML로 파싱
+          data = await parseXML(responseText);
+          // XML 구조를 JSON과 동일하게 변환
+          if (data.response) {
+            const xmlResponse = data.response;
+            data = {
+              response: {
+                header: {
+                  resultCode: xmlResponse.header?.[0]?.resultCode?.[0] || '',
+                  resultMsg: xmlResponse.header?.[0]?.resultMsg?.[0] || '',
+                },
+                body: {
+                  numOfRows: xmlResponse.body?.[0]?.numOfRows?.[0] || '',
+                  pageNo: xmlResponse.body?.[0]?.pageNo?.[0] || '',
+                  totalCount: xmlResponse.body?.[0]?.totalCount?.[0] || '',
+                  items: {
+                    item: xmlResponse.body?.[0]?.items?.[0]?.item || [],
+                  },
+                },
+              },
+            };
+          }
+        } catch (xmlError) {
+          // XML 파싱도 실패한 경우
+          console.error('KRX API Response (not JSON/XML):', responseText.substring(0, 500));
+          throw new Error(`API returned invalid response. Status: ${response.status}. This may indicate the API endpoint is incorrect or the service is unavailable.`);
+        }
       }
 
       if (!response.ok) {
@@ -105,8 +138,13 @@ export async function GET(request: NextRequest) {
         
         // 공공데이터 API는 200 OK를 반환하지만 resultCode로 오류를 표시
         if (data.response?.header?.resultCode) {
-          const resultCode = data.response.header.resultCode;
-          const resultMsg = data.response.header.resultMsg || 'Unknown error';
+          // XML에서 파싱된 경우 배열일 수 있음
+          const resultCode = Array.isArray(data.response.header.resultCode) 
+            ? data.response.header.resultCode[0] 
+            : data.response.header.resultCode;
+          const resultMsg = Array.isArray(data.response.header.resultMsg)
+            ? data.response.header.resultMsg[0]
+            : (data.response.header.resultMsg || 'Unknown error');
           
           if (resultCode === '03') {
             throw new Error('서비스 키 오류 (CODE-03). 공공데이터 포털에서 "일반 인증키(Encoding)"를 확인하세요.');
@@ -127,9 +165,18 @@ export async function GET(request: NextRequest) {
       }
       
       // 공공데이터 API 오류 응답 확인 (HTTP 200이지만 resultCode로 오류 표시)
-      if (data.response?.header?.resultCode && data.response.header.resultCode !== '00') {
-        const resultCode = data.response.header.resultCode;
-        const resultMsg = data.response.header.resultMsg || 'Unknown error';
+      const resultCode = data.response?.header?.resultCode 
+        ? (Array.isArray(data.response.header.resultCode) 
+            ? data.response.header.resultCode[0] 
+            : data.response.header.resultCode)
+        : null;
+      const resultMsg = data.response?.header?.resultMsg
+        ? (Array.isArray(data.response.header.resultMsg)
+            ? data.response.header.resultMsg[0]
+            : data.response.header.resultMsg)
+        : 'Unknown error';
+      
+      if (resultCode && resultCode !== '00') {
         console.error('KRX API Error:', {
           resultCode: resultCode,
           resultMsg: resultMsg,
@@ -151,17 +198,31 @@ export async function GET(request: NextRequest) {
       const goldItems = Array.isArray(items) ? items : items ? [items] : [];
       
       // 최신 금 시세 데이터 (첫 번째 항목)
+      // XML에서 파싱된 경우 배열의 첫 번째 요소를 가져옴
       const latestGold = goldItems[0];
+      
+      // clpr, vs, fltRt, basDt 값 추출 (XML의 경우 배열일 수 있음)
+      const getValue = (obj: any, key: string): string => {
+        if (!obj) return '';
+        const value = obj[key];
+        if (Array.isArray(value)) return value[0] || '';
+        return value || '';
+      };
+      
+      const clpr = getValue(latestGold, 'clpr');
+      const vs = getValue(latestGold, 'vs');
+      const fltRt = getValue(latestGold, 'fltRt');
+      const basDt = getValue(latestGold, 'basDt');
       
       // 데이터 정규화
       const normalizedData = {
         gold: {
           symbol: 'KRX Gold',
-          price: latestGold?.clpr ? parseFloat(latestGold.clpr) : 82500, // 종가
+          price: clpr ? parseFloat(clpr) : 82500, // 종가
           unit: 'KRW/g',
-          change: latestGold?.vs ? parseFloat(latestGold.vs) : 0, // 전일대비
-          changePercent: latestGold?.fltRt ? parseFloat(latestGold.fltRt) : 0, // 등락률
-          asOf: latestGold?.basDt || new Date().toISOString().split('T')[0], // 기준일자
+          change: vs ? parseFloat(vs) : 0, // 전일대비
+          changePercent: fltRt ? parseFloat(fltRt) : 0, // 등락률
+          asOf: basDt || new Date().toISOString().split('T')[0], // 기준일자
           note: '공공데이터는 실시간이 아닐 수 있습니다',
         },
         silver: {
