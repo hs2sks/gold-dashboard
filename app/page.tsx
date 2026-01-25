@@ -1,65 +1,184 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { KpiCard } from '@/components/KpiCard';
+import { NewsPanel } from '@/components/NewsPanel';
+import { TradingViewEmbed } from '@/components/TradingViewEmbed';
+import { BuyingRecommendation } from '@/components/BuyingRecommendation';
+import useSWR from 'swr';
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+export default function DashboardPage() {
+  // API 호출 - 12시간마다 갱신
+  const { data: metalsData, isLoading: metalsLoading } = useSWR(
+    '/api/metals',
+    fetcher,
+    { refreshInterval: 12 * 60 * 60 * 1000 } // 12시간
+  );
+
+  const { data: fxData, isLoading: fxLoading } = useSWR(
+    '/api/fx',
+    fetcher,
+    { refreshInterval: 12 * 60 * 60 * 1000 } // 12시간
+  );
+
+  const { data: krxData, isLoading: krxLoading } = useSWR(
+    '/api/krx-gold',
+    fetcher,
+    { refreshInterval: 24 * 60 * 60 * 1000 } // 24시간마다 갱신
+  );
+
+  const { data: newsData, isLoading: newsLoading } = useSWR(
+    '/api/news',
+    fetcher,
+    { refreshInterval: 300000 } // 5분마다 갱신
+  );
+
+  const { data: recommendationsData, isLoading: recommendationsLoading } = useSWR(
+    '/api/recommendations',
+    fetcher,
+    { refreshInterval: 300000 } // 5분마다 갱신
+  );
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="min-h-screen bg-background p-4 md:p-8">
+      <div className="max-w-[1600px] mx-auto space-y-8">
+        {/* 헤더 */}
+        <header className="mb-8">
+          <h1 className="text-4xl font-bold mb-2">금/은 시세 대시보드</h1>
+          <p className="text-muted-foreground">
+            실시간 국제 금/은 시세, 국내 시세, 환율 및 관련 뉴스를 확인하세요
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+        </header>
+
+        {/* KPI 카드 그리드 - 6개 */}
+        <section>
+          <h2 className="text-2xl font-semibold mb-4">시세 정보</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <KpiCard
+              title="국제 금 시세 (XAU/USD)"
+              value={metalsData?.gold?.price || 0}
+              unit="USD/oz"
+              change={metalsData?.gold?.change}
+              changePercent={metalsData?.gold?.changePercent}
+              isLoading={metalsLoading}
+              timestamp={metalsData?.gold?.timestamp}
+              refreshInterval="12시간"
+              source="Metals API (metals.dev)"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+            <KpiCard
+              title="국제 은 시세 (XAG/USD)"
+              value={metalsData?.silver?.price || 0}
+              unit="USD/oz"
+              change={metalsData?.silver?.change}
+              changePercent={metalsData?.silver?.changePercent}
+              isLoading={metalsLoading}
+              timestamp={metalsData?.silver?.timestamp}
+              refreshInterval="12시간"
+              source="Metals API (metals.dev)"
+            />
+            <KpiCard
+              title="원-달러 환율 (USD/KRW)"
+              value={fxData?.rate || 0}
+              unit="KRW"
+              isLoading={fxLoading}
+              timestamp={fxData?.timestamp}
+              refreshInterval="12시간"
+              source="ExchangeRate-API (exchangerate-api.com)"
+            />
+            <KpiCard
+              title="국내 금 시세 (KRX)"
+              value={krxData?.gold?.price || 0}
+              unit={krxData?.gold?.unit || 'KRW/g'}
+              change={krxData?.gold?.change}
+              changePercent={krxData?.gold?.changePercent}
+              note={krxData?.gold?.note}
+              isLoading={krxLoading}
+              timestamp={krxData?.gold?.asOf}
+              refreshInterval="24시간"
+              source="공공데이터포털 (data.go.kr)"
+            />
+            <KpiCard
+              title="국내 은 시세 (KRX)"
+              value={krxData?.silver?.price || 0}
+              unit={krxData?.silver?.unit || 'KRW/g'}
+              change={krxData?.silver?.change}
+              changePercent={krxData?.silver?.changePercent}
+              note={krxData?.silver?.note}
+              isLoading={krxLoading}
+              timestamp={krxData?.silver?.asOf}
+              refreshInterval="24시간"
+              source="공공데이터포털 (data.go.kr)"
+            />
+            <KpiCard
+              title="금/은 비율"
+              value={
+                metalsData?.gold?.price && metalsData?.silver?.price
+                  ? (metalsData.gold.price / metalsData.silver.price).toFixed(2)
+                  : 0
+              }
+              note={
+                metalsData?.gold?.price && metalsData?.silver?.price
+                  ? (() => {
+                      const ratio = metalsData.gold.price / metalsData.silver.price;
+                      if (ratio > 80) return '🔵 은 저평가 (역사적 평균 대비 높음)';
+                      if (ratio < 60) return '🟡 금 저평가 (역사적 평균 대비 낮음)';
+                      return '⚪ 적정 수준 (역사적 평균 범위)';
+                    })()
+                  : undefined
+              }
+              isLoading={metalsLoading}
+            />
+          </div>
+        </section>
+
+        {/* TradingView 차트 - 4개 */}
+        <section>
+          <h2 className="text-2xl font-semibold mb-4">차트</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <TradingViewEmbed symbol="XAUUSD" title="금 (XAU/USD)" />
+            <TradingViewEmbed symbol="XAGUSD" title="은 (XAG/USD)" />
+            <TradingViewEmbed symbol="FX_IDC:USDKRW" title="원-달러 환율 (USD/KRW)" />
+            <TradingViewEmbed symbol="GC1!" title="금 선물 (Futures)" />
+          </div>
+        </section>
+
+        {/* 구매 제안 섹션 */}
+        <section>
+          <h2 className="text-2xl font-semibold mb-4">AI 구매 제안</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {recommendationsData?.recommendations?.gold && (
+              <BuyingRecommendation
+                recommendation={recommendationsData.recommendations.gold}
+                price={metalsData?.gold?.price || 0}
+                isLoading={recommendationsLoading || metalsLoading}
+              />
+            )}
+            {recommendationsData?.recommendations?.silver && (
+              <BuyingRecommendation
+                recommendation={recommendationsData.recommendations.silver}
+                price={metalsData?.silver?.price || 0}
+                isLoading={recommendationsLoading || metalsLoading}
+              />
+            )}
+          </div>
+          {recommendationsData?.marketContext && (
+            <div className="mt-4 p-4 rounded-lg bg-muted/50 text-sm text-muted-foreground">
+              <p>
+                <strong>금/은 비율:</strong> {recommendationsData.marketContext.goldSilverRatio}
+                {' · '}
+                <strong>업데이트:</strong>{' '}
+                {new Date(recommendationsData.marketContext.timestamp).toLocaleString('ko-KR')}
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* 뉴스 패널 */}
+        <section>
+          <NewsPanel news={newsData?.news || []} isLoading={newsLoading} />
+        </section>
+      </div>
     </div>
   );
 }
