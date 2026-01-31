@@ -209,7 +209,7 @@ export async function GET(request: NextRequest) {
       cache = {
         data: mockData,
         timestamp: Date.now(),
-        date: date || null,
+        date: date || undefined,
       };
       
       return NextResponse.json(mockData);
@@ -383,7 +383,7 @@ export async function GET(request: NextRequest) {
       cache = {
         data: normalizedData,
         timestamp: Date.now(),
-        date: date || null,
+        date: date || undefined,
       };
 
       return NextResponse.json(normalizedData, {
