@@ -169,6 +169,36 @@ export default function DashboardPage() {
               }
               isLoading={metalsLoading}
             />
+            <KpiCard
+              title="국내 예상 금값 (VAT 포함)"
+              value={
+                metalsData?.gold?.price && fxData?.rate
+                  ? (() => {
+                      // 트로이 온스 그램 변환: 1oz = 31.1034768g
+                      const OUNCE_TO_GRAM = 31.1034768;
+                      // 부가가치세: 10%
+                      const VAT_RATE = 1.1;
+                      
+                      // 국제 금값 (USD/oz) × 환율 (KRW/USD) = KRW/oz
+                      const pricePerOunceKRW = metalsData.gold.price * fxData.rate;
+                      // KRW/oz ÷ 31.1034768 = KRW/g
+                      const pricePerGramKRW = pricePerOunceKRW / OUNCE_TO_GRAM;
+                      // KRW/g × 1.1 (VAT 10%) = 국내 예상 금값
+                      const priceWithVAT = pricePerGramKRW * VAT_RATE;
+                      
+                      return Math.round(priceWithVAT);
+                    })()
+                  : 0
+              }
+              unit="KRW/g"
+              note={
+                metalsData?.gold?.price && fxData?.rate
+                  ? `계산식: (국제 금값 ${metalsData.gold.price.toFixed(2)} USD/oz × 환율 ${fxData.rate.toLocaleString()} KRW/USD) ÷ 31.1034768g × 1.1 (VAT 10%)`
+                  : undefined
+              }
+              isLoading={metalsLoading || fxLoading}
+              source="계산값 (국제 금값 + 환율 기반)"
+            />
           </div>
         </section>
 

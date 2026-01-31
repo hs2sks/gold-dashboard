@@ -47,6 +47,9 @@ export function KpiCard({
         <h3 className="text-sm font-medium text-muted-foreground mb-2">
           {title}
         </h3>
+        {note && (
+          <p className="text-xs text-muted-foreground mb-2">{note}</p>
+        )}
         <div className="flex items-baseline gap-2 mb-2">
           <span className="text-3xl font-bold">
             {typeof value === 'number' ? value.toLocaleString() : value}
@@ -76,9 +79,6 @@ export function KpiCard({
               <span>({isPositive ? '+' : ''}{changePercent.toFixed(2)}%)</span>
             )}
           </div>
-        )}
-        {note && (
-          <p className="text-xs text-muted-foreground mt-2">{note}</p>
         )}
         {source && (
           <p className="text-xs text-muted-foreground mt-2">
