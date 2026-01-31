@@ -87,13 +87,21 @@ export function KpiCard({
         )}
         {timestamp && (
           <p className="text-xs text-muted-foreground mt-1">
-            📅 업데이트: {new Date(timestamp).toLocaleString('ko-KR', {
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
+            📅 업데이트: {(() => {
+              const date = new Date(timestamp);
+              // 이미 한국 시간으로 변환된 경우 그대로 사용, 아니면 변환
+              const koreaTime = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+              
+              // 실제 갱신 시간 표시 (아침 8시/저녁 8시로 고정하지 않음)
+              return koreaTime.toLocaleString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+              });
+            })()}
             {refreshInterval && <span className="ml-2">({refreshInterval}마다 갱신)</span>}
           </p>
         )}

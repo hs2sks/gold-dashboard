@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { KpiCard } from '@/components/KpiCard';
 import { NewsPanel } from '@/components/NewsPanel';
 import { TradingViewEmbed } from '@/components/TradingViewEmbed';
@@ -9,6 +10,35 @@ import useSWR from 'swr';
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function DashboardPage() {
+  // 현재 날짜와 시간 상태
+  const [currentDateTime, setCurrentDateTime] = useState<string>('');
+
+  // 날짜와 시간 업데이트 (1초마다)
+  useEffect(() => {
+    const updateDateTime = () => {
+      const now = new Date();
+      const koreaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+      const formatted = koreaTime.toLocaleString('ko-KR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      });
+      setCurrentDateTime(formatted);
+    };
+
+    // 즉시 업데이트
+    updateDateTime();
+
+    // 1초마다 업데이트
+    const interval = setInterval(updateDateTime, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   // API 호출 - 12시간마다 갱신
   const { data: metalsData, isLoading: metalsLoading } = useSWR(
     '/api/metals',
@@ -43,40 +73,62 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-[1600px] mx-auto space-y-8">
-        {/* 헤더 */}
-        <header className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">금/은 시세 대시보드</h1>
-          <p className="text-muted-foreground">
-            실시간 국제 금/은 시세, 국내 시세, 환율 및 관련 뉴스를 확인하세요
-          </p>
+        {/* 헤더 - 스크롤해도 고정 */}
+        <header className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 mb-8 pt-4 pb-4 border-b border-border/40">
+          <div className="border-t-2 border-orange-200 mb-4"></div>
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-2">
+            <div>
+              <h1 className="text-4xl font-bold mb-2">금/은 시세 대시보드</h1>
+              <p className="text-muted-foreground">
+                실시간 국제 금/은 시세, 국내 시세, 환율 및 관련 뉴스를 확인하세요
+              </p>
+            </div>
+            {currentDateTime && (
+              <div className="text-right">
+                <p className="text-sm font-medium text-muted-foreground">
+                  {currentDateTime}
+                </p>
+              </div>
+            )}
+          </div>
         </header>
 
         {/* KPI 카드 그리드 - 6개 */}
         <section>
           <h2 className="text-2xl font-semibold mb-4">시세 정보</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <KpiCard
-              title="국제 금 시세 (XAU/USD)"
-              value={metalsData?.gold?.price || 0}
-              unit="USD/oz"
-              change={metalsData?.gold?.change}
-              changePercent={metalsData?.gold?.changePercent}
-              isLoading={metalsLoading}
-              timestamp={metalsData?.gold?.timestamp}
-              refreshInterval="12시간"
-              source="Metals API (metals.dev)"
-            />
-            <KpiCard
-              title="국제 은 시세 (XAG/USD)"
-              value={metalsData?.silver?.price || 0}
-              unit="USD/oz"
-              change={metalsData?.silver?.change}
-              changePercent={metalsData?.silver?.changePercent}
-              isLoading={metalsLoading}
-              timestamp={metalsData?.silver?.timestamp}
-              refreshInterval="12시간"
-              source="Metals API (metals.dev)"
-            />
+            {metalsData?.error ? (
+              <div className="rounded-lg border bg-card p-6 shadow-sm">
+                <p className="text-sm text-muted-foreground">
+                  ⚠️ {metalsData.error}: {metalsData.message || '데이터를 불러올 수 없습니다'}
+                </p>
+              </div>
+            ) : (
+              <>
+                <KpiCard
+                  title="국제 금 시세 (XAU/USD)"
+                  value={metalsData?.gold?.price ?? 0}
+                  unit="USD/oz"
+                  change={metalsData?.gold?.change}
+                  changePercent={metalsData?.gold?.changePercent}
+                  isLoading={metalsLoading}
+                  timestamp={metalsData?.gold?.updatedAt}
+                  refreshInterval="12시간"
+                  source="Metals API (metals.dev)"
+                />
+                <KpiCard
+                  title="국제 은 시세 (XAG/USD)"
+                  value={metalsData?.silver?.price ?? 0}
+                  unit="USD/oz"
+                  change={metalsData?.silver?.change}
+                  changePercent={metalsData?.silver?.changePercent}
+                  isLoading={metalsLoading}
+                  timestamp={metalsData?.silver?.updatedAt}
+                  refreshInterval="12시간"
+                  source="Metals API (metals.dev)"
+                />
+              </>
+            )}
             <KpiCard
               title="원-달러 환율 (USD/KRW)"
               value={fxData?.rate || 0}
@@ -94,19 +146,7 @@ export default function DashboardPage() {
               changePercent={krxData?.gold?.changePercent}
               note={krxData?.gold?.note}
               isLoading={krxLoading}
-              timestamp={krxData?.gold?.asOf}
-              refreshInterval="24시간"
-              source="공공데이터포털 (data.go.kr)"
-            />
-            <KpiCard
-              title="국내 은 시세 (KRX)"
-              value={krxData?.silver?.price || 0}
-              unit={krxData?.silver?.unit || 'KRW/g'}
-              change={krxData?.silver?.change}
-              changePercent={krxData?.silver?.changePercent}
-              note={krxData?.silver?.note}
-              isLoading={krxLoading}
-              timestamp={krxData?.silver?.asOf}
+              timestamp={krxData?.gold?.updatedAt}
               refreshInterval="24시간"
               source="공공데이터포털 (data.go.kr)"
             />
